@@ -56,8 +56,7 @@ void InitLight(void)
 
 
 	g_Light[1].Enable = TRUE;									// このライトをON
-	g_Light[0].Enable = TRUE;									// このライトをOFF
-
+	g_Light[0].Enable = TRUE;
 
 	// フォグの初期化（霧の効果）
 	g_Fog.FogStart = 100.0f;									// 視点からこの距離離れるとフォグがかかり始める
@@ -80,12 +79,12 @@ void UpdateLight(void)
 	g_Light[1].Type = LIGHT_TYPE_DIRECTIONAL;					// 並行光源
 
 	g_Light[1].Ambient = XMFLOAT4(0.25f, 0.25f, 0.25f, 1.0f);
-	g_Light[1].Position = XMFLOAT3(60.0f, 50.0f, 25.0f);
+	g_Light[1].Position = XMFLOAT3(600.0f, 500.0f, 250.0f);
 
 	g_Light[0].Direction = XMFLOAT3(-1.0f, -15.0f, -13.0f);		// 光の向き
 	g_Light[0].Diffuse = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);	// 光の色
 	g_Light[0].Type = LIGHT_TYPE_DIRECTIONAL;					// 並行光源
-	g_Light[0].Position = XMFLOAT3(-40.0f, 20.0f, 5.0f);
+	g_Light[0].Position = XMFLOAT3(-400.0f, 200.0f, 50.0f);
 	g_Light[0].Ambient = XMFLOAT4(0.4f, 0.4f, 0.4f, 1.0f);
 	SetLight(0, &g_Light[0]);
 	XMFLOAT3 targetPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
@@ -141,7 +140,7 @@ void UpdateLight(void)
 void SetLightViewProjBuffer(int lightIdx)
 {
 	g_LightViewProj.LightIndex = lightIdx;
-	SetLightProjView2(&g_LightViewProj.ProjView[lightIdx]);
+	//SetLightProjView2(&g_LightViewProj.ProjView[lightIdx]);
 	SetLightProjView(&g_LightViewProj);
 }
 

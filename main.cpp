@@ -16,7 +16,9 @@
 #include "shadow.h"
 #include "light.h"
 #include "ground.h"
-
+#include "sprite.h"
+#include "score.h"
+#include "offScreenRender.h"
 //*****************************************************************************
 // マクロ定義
 //*****************************************************************************
@@ -235,6 +237,10 @@ HRESULT Init(HINSTANCE hInstance, HWND hWnd, BOOL bWindow)
 
 	InitGround();
 
+	InitOffScreenRender();
+
+	InitScore();
+
 	// ライトを有効化
 	SetLightEnable(TRUE);
 
@@ -271,8 +277,12 @@ void Uninit(void)
 	//入力の終了処理
 	UninitInput();
 
+	UninitScore();
+
 	// レンダラーの終了処理
 	UninitRenderer();
+
+	UninitOffScreenRender();
 }
 
 //=============================================================================
@@ -317,52 +327,49 @@ void Draw(void)
 	SetCameraAT(pos);
 	SetCamera();
 
-	for (int i = 1; i >= 0; i--)
+	for (int i = 2; i >= 0; i--)
 	{
 		LIGHT* light = GetLightData(i);
 		if (light->Enable == FALSE) continue;
 
 		SetRenderShadowMap(i);
 
-		// フィールドの描画処理
-		//DrawField();
-
-		// 影の描画処理
-		//DrawShadow();
-
-		// プレイヤーの描画処理
 		DrawPlayer();
 
-		// エネミーの描画処理
 		DrawEnemy();
 
 		DrawGround();
 	}
 
 	SetRenderObject();
+	DrawScene();
 
-	DrawField();
+	SetOffScreenRender();
+	DrawScene();
 
-	// 影の描画処理
-	//DrawShadow();
-
-	// プレイヤーの描画処理
-	DrawPlayer();
-
-	// エネミーの描画処理
-	DrawEnemy();
-
-	DrawGround();
+	SetLightEnable(FALSE);
+	DrawOffScreenRender();
+	SetLightEnable(FALSE);
 
 #ifdef _DEBUG
 	// デバッグ表示
-	//DrawDebugProc();
+	DrawDebugProc();
 #endif
 
 	// バックバッファ、フロントバッファ入れ替え
 	Present();
 }
 
+void DrawScene()
+{
+	DrawField();
+
+	DrawPlayer();
+
+	DrawEnemy();
+
+	DrawGround();
+}
 
 long GetMousePosX(void)
 {

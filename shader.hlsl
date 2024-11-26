@@ -11,6 +11,12 @@ struct LightViewProjBuffer
     int padding[3];
 };
 
+struct MODE
+{
+    int mode;
+    int padding[3];
+};
+
 // マトリクスバッファ
 cbuffer WorldBuffer : register( b0 )
 {
@@ -30,6 +36,11 @@ cbuffer ProjectionBuffer : register( b2 )
 cbuffer ProjViewBuffer : register(b8)
 {
     LightViewProjBuffer ProjView;
+}
+
+cbuffer ModeBuffer : register(b10)
+{
+    MODE md;
 }
 
 // マテリアルバッファ
@@ -142,7 +153,7 @@ void VertexShaderPolygon( in  float4 inPosition		: POSITION0,
 Texture2D		g_Texture : register( t0 );
 SamplerState	g_SamplerState : register( s0 );
 Texture2D g_ShadowMap[5] : register(t1);
-Texture2D g_ShadowMap2 : register(t2);
+Texture2D g_TextureSmall : register(t7);
 SamplerComparisonState g_ShadowSampler : register(s1);
 
 //=============================================================================
@@ -157,7 +168,8 @@ void PixelShaderPolygon( in  float4 inPosition		: SV_POSITION,
 
 						 out float4 outDiffuse		: SV_Target )
 {
-	float4 color;
+    float4 color;
+	
 
 	if (Material.noTexSampling == 0)
 	{
@@ -168,7 +180,7 @@ void PixelShaderPolygon( in  float4 inPosition		: SV_POSITION,
 	else
 	{
 		color = inDiffuse;
-	}
+    }
 
 	if (Light.Enable == 0)
 	{
@@ -229,7 +241,7 @@ void PixelShaderPolygon( in  float4 inPosition		: SV_POSITION,
       //              }
                     //tempColor = float4(currentDepth, currentDepth, currentDepth, 1.0f);
                     //float shadowMapValue = g_ShadowMap[2].Sample(g_SamplerState, shadowTexCoord).r;
-                    //tempColor = float4(shadowMapValue, shadowMapValue, shadowMapValue, 1.0f);
+                   // tempColor = float4(shadowMapValue, shadowMapValue, shadowMapValue, 1.0f);
         
                     shadowFactor = g_ShadowMap[i].SampleCmpLevelZero(g_ShadowSampler, shadowTexCoord, currentDepth);
 					//if (shadowFactor == 0.0f)
@@ -264,7 +276,30 @@ void PixelShaderPolygon( in  float4 inPosition		: SV_POSITION,
 	{
 		outDiffuse = color;
 	}
+	
+    if (md.mode == 1)
+    {
 
+        //color.a *= 0.5f;
+        float2 centeredTexcoord = inTexCoord - float2(0.5, 0.5);
+
+        float distanceFromCenter = length(centeredTexcoord);
+        float angle = distanceFromCenter * 5;
+
+        float sinAngle = sin(angle);
+        float cosAngle = cos(angle);
+        float2 rotatedTexcoord;
+        rotatedTexcoord.x = centeredTexcoord.x * cosAngle - centeredTexcoord.y * sinAngle;
+        rotatedTexcoord.y = centeredTexcoord.x * sinAngle + centeredTexcoord.y * cosAngle;
+
+        rotatedTexcoord += float2(0.5, 0.5);
+		
+        color = g_TextureSmall.Sample(g_SamplerState, rotatedTexcoord);
+        outDiffuse = color;
+        return;
+
+    }
+	
 	//縁取り
 	//if (fuchi == 1)
 	//{

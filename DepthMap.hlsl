@@ -92,7 +92,7 @@ cbuffer CameraBuffer : register(b7)
 
 cbuffer ProjViewBuffer : register(b8)
 {
-    LightViewProjBuffer ProjView;
+    LightViewProjBuffer lightBuffer;
 }
 
 cbuffer ProjViewBuffer2 : register(b9)
@@ -112,8 +112,8 @@ void VS(in float4 inPosition : POSITION0,
 						  out float4 outPosition : SV_POSITION)
 {
     float4 worldPosition = mul(inPosition, World);
-    outPosition = mul(worldPosition, ProjView2);
-
+    //outPosition = mul(worldPosition, lightBuffer.ProjView[lightBuffer.LightIndex]);
+    outPosition = mul(worldPosition, lightBuffer.ProjView[4]);
 }
 
 

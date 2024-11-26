@@ -84,4 +84,4 @@ enum
 long GetMousePosX(void);
 long GetMousePosY(void);
 char* GetDebugStr(void);
-
+void DrawScene(void);

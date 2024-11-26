@@ -86,6 +86,7 @@ struct FOG {
 	XMFLOAT4	FogColor;	// フォグの色
 };
 
+
 struct LightViewProjBuffer
 {
 	XMMATRIX ProjView[LIGHT_MAX];
@@ -133,4 +134,4 @@ void SetClearColor(float* color4);
 
 void SetRenderShadowMap(int lightIdx);
 void SetRenderObject(void);
-void SetLightProjView2(XMMATRIX* lightBuffer);
+void ResetRenderTarget(void);

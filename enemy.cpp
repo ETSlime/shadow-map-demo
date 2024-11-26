@@ -378,7 +378,7 @@ void DrawEnemy(void)
 		// モデル描画
 		DrawModel(&g_Enemy[i].model);
 
-		//DrawHPGauge(i);
+		DrawHPGauge(i);
 	}
 
 	// カリング設定を戻す
@@ -426,7 +426,7 @@ void DrawHPGauge(int idx)
 		mtxWorld.r[2].m128_f32[2] = mtxView.r[2].m128_f32[2];
 
 		int ratio = g_Enemy[idx].HP / g_Enemy[idx].maxHP;
-		MakeVertexHPGauge(35.0f * ratio, 5.0f);
+		MakeVertexHPGauge(15.0f * ratio, 5.0f);
 
 		// スケールを反映
 		mtxScl = XMMatrixScaling(g_HPGauge[idx].scl.x, g_HPGauge[idx].scl.y, g_HPGauge[idx].scl.z);

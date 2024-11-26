@@ -7,6 +7,7 @@
 #include "main.h"
 #include "renderer.h"
 #include "light.h"
+#include "sprite.h"
 //デバッグ用画面テキスト出力を有効にする
 #define DEBUG_DISP_TEXTOUT
 //シェーダーデバッグ設定を有効にする
@@ -83,10 +84,10 @@ static D3D_FEATURE_LEVEL       g_FeatureLevel = D3D_FEATURE_LEVEL_11_0;
 static ID3D11Device*           g_D3DDevice = NULL;
 static ID3D11DeviceContext*    g_ImmediateContext = NULL;
 static IDXGISwapChain*         g_SwapChain = NULL;
+
 static ID3D11RenderTargetView* g_RenderTargetView = NULL;
+
 static ID3D11DepthStencilView* g_ShadowDSV[LIGHT_MAX];
-static ID3D11DepthStencilView* g_ShadowDSV1 = NULL;
-static ID3D11DepthStencilView* g_ShadowDSV2 = NULL;
 static ID3D11DepthStencilView* g_SceneDepthStencilView = NULL;
 
 static ID3D11VertexShader*		g_VertexShader = NULL;
@@ -102,7 +103,6 @@ static ID3D11Buffer*			g_FogBuffer = NULL;
 static ID3D11Buffer*			g_FuchiBuffer = NULL;
 static ID3D11Buffer*			g_CameraBuffer = NULL;
 static ID3D11Buffer*			g_LightProjViewBuffer = NULL;
-static ID3D11Buffer*			g_LightProjViewBuffer2 = NULL;
 
 static ID3D11ShaderResourceView* g_ShadowMapSRV[LIGHT_MAX];
 
@@ -340,12 +340,8 @@ void SetLight(int index, LIGHT* pLight)
 
 void SetLightProjView(LightViewProjBuffer *lightBuffer)
 {
+	lightBuffer->ProjView[4] = lightBuffer->ProjView[lightBuffer->LightIndex];
 	GetDeviceContext()->UpdateSubresource(g_LightProjViewBuffer, 0, NULL, lightBuffer, 0, 0);
-}
-
-void SetLightProjView2(XMMATRIX* lightBuffer)
-{
-	GetDeviceContext()->UpdateSubresource(g_LightProjViewBuffer2, 0, NULL, lightBuffer, 0, 0);
 }
 
 void SetFogBuffer(void)
@@ -403,7 +399,7 @@ void SetRenderShadowMap(int lightIdx)
 void SetRenderObject(void)
 {
 
-	GetDeviceContext()->OMSetRenderTargets(1, &g_RenderTargetView, g_SceneDepthStencilView);
+	ResetRenderTarget();
 	GetDeviceContext()->ClearDepthStencilView(g_SceneDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
 
@@ -412,6 +408,10 @@ void SetRenderObject(void)
 	GetDeviceContext()->PSSetShaderResources(1, LIGHT_MAX, g_ShadowMapSRV);
 }
 
+void ResetRenderTarget(void)
+{
+	GetDeviceContext()->OMSetRenderTargets(1, &g_RenderTargetView, g_SceneDepthStencilView);
+}
 
 //=============================================================================
 // 初期化処理
@@ -507,36 +507,6 @@ HRESULT InitRenderer(HINSTANCE hInstance, HWND hWnd, BOOL bWindow)
 		srvDesc.Texture2D.MipLevels = 1;
 		g_D3DDevice->CreateShaderResourceView(depthTexture, &srvDesc, &g_ShadowMapSRV[i]);
 	}
-
-	////ステンシルターゲット作成
-	//D3D11_DEPTH_STENCIL_VIEW_DESC dsvd;
-	//ZeroMemory(&dsvd, sizeof(dsvd));
-	//dsvd.Format = DXGI_FORMAT_D32_FLOAT;
-	//dsvd.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-	//dsvd.Flags = 0;
-	//g_D3DDevice->CreateDepthStencilView(depthTexture, &dsvd, &g_ShadowDSV1);
-
-	////ステンシルターゲット作成
-	//ZeroMemory(&dsvd, sizeof(dsvd));
-	//dsvd.Format = DXGI_FORMAT_D32_FLOAT;
-	//dsvd.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-	//dsvd.Flags = 0;
-	//g_D3DDevice->CreateDepthStencilView(depthTexture, &dsvd, &g_ShadowDSV2);
-
-
-	//D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	//srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-	//srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-	//srvDesc.Texture2D.MostDetailedMip = 0;
-	//srvDesc.Texture2D.MipLevels = 1;
-	//g_D3DDevice->CreateShaderResourceView(depthTexture, &srvDesc, &g_ShadowMapSRV1);
-
-
-	//srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-	//srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-	//srvDesc.Texture2D.MostDetailedMip = 0;
-	//srvDesc.Texture2D.MipLevels = 1;
-	//g_D3DDevice->CreateShaderResourceView(depthTexture, &srvDesc, &g_ShadowMapSRV2);
 
 
 	D3D11_TEXTURE2D_DESC sceneDepthDesc = {};
@@ -802,10 +772,6 @@ HRESULT InitRenderer(HINSTANCE hInstance, HWND hWnd, BOOL bWindow)
 	g_D3DDevice->CreateBuffer(&hBufferDesc, NULL, &g_LightProjViewBuffer);
 	g_ImmediateContext->VSSetConstantBuffers(8, 1, &g_LightProjViewBuffer);
 	g_ImmediateContext->PSSetConstantBuffers(8, 1, &g_LightProjViewBuffer);
-	hBufferDesc.ByteWidth = sizeof(XMMATRIX);
-	g_D3DDevice->CreateBuffer(&hBufferDesc, NULL, &g_LightProjViewBuffer2);
-	g_ImmediateContext->VSSetConstantBuffers(9, 1, &g_LightProjViewBuffer2);
-	g_ImmediateContext->PSSetConstantBuffers(9, 1, &g_LightProjViewBuffer2);
 
 	//フォグ情報
 	hBufferDesc.ByteWidth = sizeof(FOG_CBUFFER);
@@ -898,10 +864,6 @@ void Clear(void)
 	// バックバッファクリア
 	g_ImmediateContext->ClearRenderTargetView( g_RenderTargetView, g_ClearColor );
 	g_ImmediateContext->ClearDepthStencilView( g_SceneDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
-	//for (int i = 0; i < LIGHT_MAX; i++)
-	//{
-	//	g_ImmediateContext->ClearDepthStencilView(g_ShadowDSV[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
-	//}
 }
 
 
