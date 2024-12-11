@@ -19,6 +19,7 @@
 #include "sprite.h"
 #include "score.h"
 #include "offScreenRender.h"
+#include "MapEditor.h"
 //*****************************************************************************
 // マクロ定義
 //*****************************************************************************
@@ -40,6 +41,7 @@ void Draw(void);
 long g_MouseX = 0;
 long g_MouseY = 0;
 
+MapEditor& mapEditor = MapEditor::get_instance();
 
 #ifdef _DEBUG
 int		g_CountFPS;							// FPSカウンタ
@@ -241,6 +243,8 @@ HRESULT Init(HINSTANCE hInstance, HWND hWnd, BOOL bWindow)
 
 	InitScore();
 
+	mapEditor.Init();
+
 	// ライトを有効化
 	SetLightEnable(TRUE);
 
@@ -283,6 +287,8 @@ void Uninit(void)
 	UninitRenderer();
 
 	UninitOffScreenRender();
+
+	mapEditor.Uninit();
 }
 
 //=============================================================================
@@ -311,6 +317,8 @@ void Update(void)
 
 	// 影の更新処理
 	UpdateShadow();
+
+	mapEditor.Update();
 }
 
 //=============================================================================
@@ -334,22 +342,30 @@ void Draw(void)
 
 		SetRenderShadowMap(i);
 
-		DrawPlayer();
+		//DrawPlayer();
 
-		DrawEnemy();
+		//DrawEnemy();
 
-		DrawGround();
+		//DrawGround();
+
+		DrawScene();
 	}
 
 	SetRenderObject();
 	DrawScene();
 
-	SetOffScreenRender();
-	DrawScene();
+	SetLightEnable(FALSE);
+	mapEditor.Draw();
+	DrawScore();
+	SetLightEnable(TRUE);
+	
 
-	SetLightEnable(FALSE);
-	DrawOffScreenRender();
-	SetLightEnable(FALSE);
+	//SetOffScreenRender();
+	//DrawScene();
+
+	//SetLightEnable(FALSE);
+	//DrawOffScreenRender();
+	//SetLightEnable(FALSE);
 
 #ifdef _DEBUG
 	// デバッグ表示

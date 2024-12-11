@@ -55,7 +55,7 @@ void InitLight(void)
 	}
 
 
-	g_Light[1].Enable = TRUE;									// このライトをON
+	g_Light[1].Enable = FALSE;									// このライトをON
 	g_Light[0].Enable = TRUE;
 
 	// フォグの初期化（霧の効果）
@@ -73,6 +73,8 @@ void InitLight(void)
 //=============================================================================
 void UpdateLight(void)
 {
+	PLAYER* player = GetPlayer();
+
 	// 並行光源の設定（世界を照らす光）
 	g_Light[1].Direction = XMFLOAT3(-1.0f, -15.0f, -13.0f);		// 光の向き
 	g_Light[1].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);	// 光の色
@@ -81,24 +83,29 @@ void UpdateLight(void)
 	g_Light[1].Ambient = XMFLOAT4(0.25f, 0.25f, 0.25f, 1.0f);
 	g_Light[1].Position = XMFLOAT3(600.0f, 500.0f, 250.0f);
 
-	g_Light[0].Direction = XMFLOAT3(-1.0f, -15.0f, -13.0f);		// 光の向き
+	//g_Light[0].Direction = XMFLOAT3(-1.0f, -15.0f, -13.0f);		// 光の向き
+	g_Light[0].Direction = XMFLOAT3(1.1f, -1.0f, 0.0f);		// 光の向き
 	g_Light[0].Diffuse = XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f);	// 光の色
 	g_Light[0].Type = LIGHT_TYPE_DIRECTIONAL;					// 並行光源
-	g_Light[0].Position = XMFLOAT3(-400.0f, 200.0f, 50.0f);
+	//g_Light[0].Position = XMFLOAT3(-400.0f, 200.0f, 50.0f);
+
+	g_Light[0].Position = XMFLOAT3(0.0f, 0.0f, 0.0f); // player->trans[ALL].pos;
+	g_Light[0].Position.y += 11;
 	g_Light[0].Ambient = XMFLOAT4(0.4f, 0.4f, 0.4f, 1.0f);
 	SetLight(0, &g_Light[0]);
 	XMFLOAT3 targetPosition = XMFLOAT3(0.0f, 0.0f, 0.0f);
 	XMFLOAT3 lightUp = { 0.0f, 1.0f, 0.0f };
+	XMVECTOR pos = XMLoadFloat3(&g_Light[0].Position);
+	XMVECTOR lightDir = XMLoadFloat3(&g_Light[0].Direction);
 	XMMATRIX lightView = XMMatrixLookAtLH(
 		XMLoadFloat3(&g_Light[0].Position),
-		XMLoadFloat3(&targetPosition),
+		pos + lightDir,
 		XMLoadFloat3(&lightUp)
 	);
-	XMMATRIX lightProj = XMMatrixOrthographicLH(SCREEN_WIDTH * 1.2f, SCREEN_HEIGHT * 1.2f, VIEW_NEAR_Z, VIEW_FAR_Z);
+	XMMATRIX lightProj = XMMatrixOrthographicLH(SCREEN_WIDTH, SCREEN_WIDTH, VIEW_NEAR_Z, VIEW_FAR_Z);
 	g_LightViewProj.ProjView[0] = XMMatrixTranspose(lightView * lightProj);
 
 
-	PLAYER* player = GetPlayer();
 	//targetPosition = XMFLOAT3(player->trans[ALL].pos.x, player->trans[ALL].pos.y, player->trans[ALL].pos.z);
 	XMVECTOR dir = XMVector3Normalize(
 		XMVectorSubtract(XMLoadFloat3(&targetPosition), XMLoadFloat3(&g_Light[1].Position))

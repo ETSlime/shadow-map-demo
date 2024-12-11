@@ -31,6 +31,12 @@ struct DX11_SUBSET
 	DX11_MODEL_MATERIAL	Material;
 };
 
+struct BOUNDING_BOX
+{
+	XMFLOAT3 minPoint;
+	XMFLOAT3 maxPoint;
+};
+
 struct DX11_MODEL
 {
 	ID3D11Buffer*	VertexBuffer;
@@ -38,6 +44,13 @@ struct DX11_MODEL
 
 	DX11_SUBSET		*SubsetArray;
 	unsigned short	SubsetNum;
+
+	BOUNDING_BOX	boundingBox;
+	ID3D11Buffer*	BBVertexBuffer;
+
+	BOOL			isSelected;
+	BOOL			isCursorIn;
+	int				editorIdx;
 };
 
 
@@ -48,11 +61,15 @@ struct DX11_MODEL
 void LoadModel( char *FileName, DX11_MODEL *Model );
 void UnloadModel( DX11_MODEL *Model );
 void DrawModel( DX11_MODEL *Model );
-
+void DrawBoundingBox(DX11_MODEL* Model);
+void DrawModelEditor(DX11_MODEL* Model);
+void UpdateModelEditor(DX11_MODEL* Model);
 // モデルのマテリアルのディフューズを取得する。Max16個分にしてある
 void GetModelDiffuse(DX11_MODEL *Model, XMFLOAT4 *diffuse);
 
 // モデルの指定マテリアルのディフューズをセットする。
 void SetModelDiffuse(DX11_MODEL *Model, int mno, XMFLOAT4 diffuse);
+
+void CreateBoundingBoxVertex(DX11_MODEL* Model);
 
 

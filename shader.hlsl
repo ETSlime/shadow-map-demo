@@ -242,8 +242,22 @@ void PixelShaderPolygon( in  float4 inPosition		: SV_POSITION,
                     //tempColor = float4(currentDepth, currentDepth, currentDepth, 1.0f);
                     //float shadowMapValue = g_ShadowMap[2].Sample(g_SamplerState, shadowTexCoord).r;
                    // tempColor = float4(shadowMapValue, shadowMapValue, shadowMapValue, 1.0f);
-        
-                    shadowFactor = g_ShadowMap[i].SampleCmpLevelZero(g_ShadowSampler, shadowTexCoord, currentDepth);
+                    int kernelSize = 1;
+                    float2 shadowMapDimensions = float2(960, 540);
+                    float shadow = 0.0;
+                    float2 texelSize = 1.0 / shadowMapDimensions;
+                    float totalWeight = 0.0;
+                    for (int x = -kernelSize; x <= kernelSize; x++)
+                    {
+                        for (int y = -kernelSize; y <= kernelSize; y++)
+                        {
+                            float weight = exp(-(x * x + y * y) / (2.0 * kernelSize * kernelSize)); // gaussian weight
+                            shadow += g_ShadowMap[i].SampleCmpLevelZero(g_ShadowSampler, shadowTexCoord + float2(x, y) * texelSize, currentDepth) * weight;
+                            totalWeight += weight;
+                        }
+                    }
+                    shadowFactor = shadow / totalWeight;
+                    //shadowFactor = g_ShadowMap[i].SampleCmpLevelZero(g_ShadowSampler, shadowTexCoord, currentDepth);
 					//if (shadowFactor == 0.0f)
      //                   shadowFactor = 0.4f;
 					
@@ -299,6 +313,9 @@ void PixelShaderPolygon( in  float4 inPosition		: SV_POSITION,
         return;
 
     }
+	
+ 
+
 	
 	//‰Žæ‚è
 	//if (fuchi == 1)

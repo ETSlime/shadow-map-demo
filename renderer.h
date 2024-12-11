@@ -63,6 +63,18 @@ struct MATERIAL
 	XMFLOAT4	Emission;
 	float		Shininess;
 	int			noTexSampling;
+	BOOL		LoadMaterial;
+
+	MATERIAL()
+	{
+		noTexSampling = 1;
+		LoadMaterial = FALSE;
+		Ambient = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+		Diffuse = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+		Specular = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+		Emission = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+		Shininess = 0.0f;
+	}
 };
 
 // ÉâÉCÉgç\ë¢ëÃ
@@ -92,6 +104,12 @@ struct LightViewProjBuffer
 	XMMATRIX ProjView[LIGHT_MAX];
 	int LightIndex;
 	int padding[3];
+};
+
+enum RenderMode
+{
+	RENDER_MODE_SCENE,
+	RENDER_MODE_SHADOW,
 };
 
 //*****************************************************************************
@@ -129,9 +147,10 @@ void DebugTextOut(char* text, int x, int y);
 
 void SetFuchi(int flag);
 void SetShaderCamera(XMFLOAT3 pos);
-
+void SetFillMode(D3D11_FILL_MODE mode);
 void SetClearColor(float* color4);
 
 void SetRenderShadowMap(int lightIdx);
 void SetRenderObject(void);
 void ResetRenderTarget(void);
+int GetRenderMode(void);

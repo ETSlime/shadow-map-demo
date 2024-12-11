@@ -112,7 +112,6 @@ void VS(in float4 inPosition : POSITION0,
 						  out float4 outPosition : SV_POSITION)
 {
     float4 worldPosition = mul(inPosition, World);
-    //outPosition = mul(worldPosition, lightBuffer.ProjView[lightBuffer.LightIndex]);
     outPosition = mul(worldPosition, lightBuffer.ProjView[4]);
 }
 

@@ -12,6 +12,8 @@
 #include "enemy.h"
 #include "shadow.h"
 #include "camera.h"
+#include "MapEditor.h"
+#include "score.h"
 //*****************************************************************************
 // マクロ定義
 //*****************************************************************************
@@ -103,6 +105,8 @@ HRESULT InitEnemy(void)
 	for (int i = 0; i < MAX_ENEMY; i++)
 	{
 		LoadModel(MODEL_ENEMY, &g_Enemy[i].model);
+		MapEditor::get_instance().AddToList(&g_Enemy[i].model);
+
 		g_Enemy[i].load = true;
 
 		g_Enemy[i].maxHP = 20.0f;
@@ -202,11 +206,13 @@ void UpdateEnemy(void)
 	// エネミーを動かす場合は、影も合わせて動かす事を忘れないようにね！
 	for (int i = 0; i < MAX_ENEMY; i++)
 	{
+		
+
 		if (g_Enemy[i].use == true)		// このエネミーが使われている？
 		{								// Yes
-			
+			UpdateEditorSelect(&g_Enemy[i], GetMousePosX(), GetMousePosY());
 				// 移動処理
-			if (g_Enemy[i].tblMax > 0)	// 線形補間を実行する？
+			if (g_Enemy[i].tblMax > 0 && g_Enemy[i].model.isSelected == FALSE)	// 線形補間を実行する？
 			{	// 線形補間の処理
 				int nowNo = (int)g_Enemy[i].time;			// 整数分であるテーブル番号を取り出している
 				int maxNo = g_Enemy[i].tblMax;				// 登録テーブル数を数えている
@@ -270,7 +276,11 @@ void UpdateEnemy(void)
 			UpdateHPGauge(i);
 
 			if (g_Enemy[i].HP <= 0.0f)
+			{
 				g_Enemy[i].use = FALSE;
+				AddScore(100);
+			}
+				
 
 		}
 	}
@@ -304,6 +314,95 @@ void UpdateEnemy(void)
 	}
 #endif
 
+	
+
+}
+
+void UpdateEditorSelect(ENEMY* enemy, int sx, int sy)
+{
+	if (MapEditor::get_instance().GetOnEditorCursor() == TRUE)
+	{
+		return;
+	}
+		
+	enemy->model.isCursorIn = FALSE;
+
+	CAMERA* camera = GetCamera();
+	XMMATRIX P = XMLoadFloat4x4(&camera->mtxProjection);
+
+	// Compute picking ray in view space.
+	float vx = (+2.0f * sx / SCREEN_WIDTH - 1.0f) / P.r[0].m128_f32[0];
+	float vy = (-2.0f * sy / SCREEN_HEIGHT + 1.0f) / P.r[1].m128_f32[1];
+
+	// Ray definition in view space.
+	XMVECTOR rayOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+	XMVECTOR rayDir = XMVectorSet(vx, vy, 1.0f, 0.0f);
+
+	// Tranform ray to local space of Mesh.
+	XMMATRIX V = XMLoadFloat4x4(&camera->mtxView);
+	XMMATRIX invView = XMLoadFloat4x4(&camera->mtxInvView);
+
+	XMMATRIX W = XMLoadFloat4x4(&enemy->mtxWorld);
+	XMMATRIX invWorld = XMMatrixInverse(&XMMatrixDeterminant(W), W);
+
+	XMMATRIX toLocal = XMMatrixMultiply(invView, invWorld);
+
+	rayOrigin = XMVector3TransformCoord(rayOrigin, toLocal);
+	rayDir = XMVector3TransformNormal(rayDir, toLocal);
+
+	// Make the ray direction unit length for the intersection tests.
+	rayDir = XMVector3Normalize(rayDir);
+	
+	XMVECTOR minPoint = XMLoadFloat3(&enemy->model.boundingBox.minPoint);
+	XMVECTOR maxPoint = XMLoadFloat3(&enemy->model.boundingBox.maxPoint);
+
+
+	float tMin = 0.0f;
+	float tMax = FLT_MAX;
+	BOOL intersect = FALSE;
+	for (int i = 0; i < 3; ++i) 
+	{
+		float rayOriginComponent = XMVectorGetByIndex(rayOrigin, i);
+		float rayDirComponent = XMVectorGetByIndex(rayDir, i);
+		float minComponent = XMVectorGetByIndex(minPoint, i);
+		float maxComponent = XMVectorGetByIndex(maxPoint, i);
+
+		if (fabs(rayDirComponent) < 1e-8f) {
+			if (rayOriginComponent < minComponent || rayOriginComponent > maxComponent) 
+			{
+				intersect =  FALSE;
+				return;
+			}
+		}
+		else 
+		{
+			float t1 = (minComponent - rayOriginComponent) / rayDirComponent;
+			float t2 = (maxComponent - rayOriginComponent) / rayDirComponent;
+
+			if (t1 > t2) 
+			{
+				float temp = t1;
+				t1 = t2;
+				t2 = temp;
+			}
+
+			tMin = max(tMin, t1);
+			tMax = min(tMax, t2);
+
+			if (tMin > tMax) 
+			{
+				intersect = FALSE;
+				return;
+			}
+		}
+	}
+
+	enemy->model.isCursorIn = TRUE;
+
+	UpdateModelEditor(&enemy->model);
+
+	PrintDebugProc("Enemy:X:%f Y:%f Z:%f\n", enemy->pos.x, enemy->pos.y, enemy->pos.z);
+
 }
 
 void UpdateHPGauge(int idx)
@@ -315,6 +414,8 @@ void UpdateHPGauge(int idx)
 
 void PlayEnemyWalkAnim(ENEMY* enemy)
 {
+	if (enemy->model.isSelected == TRUE) return;
+
 	float angle = (XM_PI / JUMP_CNT_MAX) * enemy->jumpCnt;
 	enemy->jumpCnt++;
 
@@ -376,7 +477,8 @@ void DrawEnemy(void)
 
 
 		// モデル描画
-		DrawModel(&g_Enemy[i].model);
+		DrawModelEditor(&g_Enemy[i].model);
+		DrawBoundingBox(&g_Enemy[i].model);
 
 		DrawHPGauge(i);
 	}

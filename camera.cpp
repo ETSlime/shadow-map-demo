@@ -45,6 +45,7 @@ void InitCamera(void)
 	g_Camera.at  = { 0.0f, 0.0f, 0.0f };
 	g_Camera.up  = { 0.0f, 1.0f, 0.0f };
 	g_Camera.rot = { 0.0f, 0.0f, 0.0f };
+	g_Camera.fov = VIEW_ANGLE;
 
 	// ‹“_‚Æ’‹“_‚Ì‹——£‚ğŒvZ
 	float vx, vz;

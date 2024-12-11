@@ -8,6 +8,9 @@
 #include "main.h"
 #include "model.h"
 #include "camera.h"
+#include "input.h"
+#include "debugproc.h"
+#include "MapEditor.h"
 
 //*****************************************************************************
 // マクロ定義
@@ -48,8 +51,8 @@ struct MODEL
 	unsigned short	IndexNum;
 	SUBSET			*SubsetArray;
 	unsigned short	SubsetNum;
+	BOUNDING_BOX	boundingBox;
 };
-
 
 
 //*****************************************************************************
@@ -75,22 +78,29 @@ void LoadModel( char *FileName, DX11_MODEL *Model )
 
 	LoadObj( FileName, &model );
 
+	Model->boundingBox = model.boundingBox;
+
 	// 頂点バッファ生成
 	{
 		D3D11_BUFFER_DESC bd;
 		ZeroMemory( &bd, sizeof(bd) );
-		bd.Usage = D3D11_USAGE_DEFAULT;
+		bd.Usage = D3D11_USAGE_DYNAMIC;
 		bd.ByteWidth = sizeof( VERTEX_3D ) * model.VertexNum;
 		bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-		bd.CPUAccessFlags = 0;
+		bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
 		D3D11_SUBRESOURCE_DATA sd;
 		ZeroMemory( &sd, sizeof(sd) );
 		sd.pSysMem = model.VertexArray;
 
 		GetDevice()->CreateBuffer( &bd, &sd, &Model->VertexBuffer );
-	}
 
+
+		bd.ByteWidth = sizeof(VERTEX_3D) * 24;
+		GetDevice()->CreateBuffer(&bd, NULL, &Model->BBVertexBuffer);
+
+		CreateBoundingBoxVertex(Model);
+	}
 
 	// インデックスバッファ生成
 	{
@@ -136,6 +146,20 @@ void LoadModel( char *FileName, DX11_MODEL *Model )
 
 }
 
+void UpdateModelEditor(DX11_MODEL* Model)
+{
+	if (Model->isCursorIn == FALSE) return;
+
+	if (IsMouseLeftTriggered())
+	{
+		Model->isSelected = Model->isSelected == TRUE ? FALSE : TRUE;
+		if (Model->isSelected == TRUE)
+			MapEditor::get_instance().SetCurSelectedModelIdx(Model->editorIdx);
+		else
+			MapEditor::get_instance().ResetCurSelectedModelIdx();
+	}
+}
+
 
 //=============================================================================
 // 終了処理
@@ -154,7 +178,6 @@ void UnloadModel( DX11_MODEL *Model )
 //=============================================================================
 void DrawModel( DX11_MODEL *Model )
 {
-
 	// 頂点バッファ設定
 	UINT stride = sizeof( VERTEX_3D );
 	UINT offset = 0;
@@ -169,7 +192,8 @@ void DrawModel( DX11_MODEL *Model )
 	for( unsigned short i = 0; i < Model->SubsetNum; i++ )
 	{
 		// マテリアル設定
-		SetMaterial( Model->SubsetArray[i].Material.Material );
+		if (Model->SubsetArray[i].Material.Material.LoadMaterial)
+			SetMaterial( Model->SubsetArray[i].Material.Material );
 
 		// テクスチャ設定
 		if (Model->SubsetArray[i].Material.Material.noTexSampling == 0)
@@ -184,7 +208,42 @@ void DrawModel( DX11_MODEL *Model )
 
 }
 
+void DrawModelEditor(DX11_MODEL* Model)
+{
+	if (Model->isCursorIn == TRUE)
+	{
+		SetFillMode(D3D11_FILL_WIREFRAME);
+		DrawModel(Model);
+		SetFillMode(D3D11_FILL_SOLID);
+	}
+	else
+	{
+		DrawModel(Model);
+	}
+}
 
+void DrawBoundingBox(DX11_MODEL* Model)
+{
+	if (GetRenderMode() == RENDER_MODE_SHADOW) return;
+
+	SetFillMode(D3D11_FILL_WIREFRAME);
+	// 頂点バッファ設定
+	UINT stride = sizeof(VERTEX_3D);
+	UINT offset = 0;
+	GetDeviceContext()->IASetVertexBuffers(0, 1, &Model->BBVertexBuffer, &stride, &offset);
+
+	// プリミティブトポロジ設定
+	GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	MATERIAL material;
+	ZeroMemory(&material, sizeof(material));
+	material.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	material.noTexSampling = TRUE;
+	SetMaterial(material);
+
+	GetDeviceContext()->Draw(24, 0);
+	SetFillMode(D3D11_FILL_SOLID);
+}
 
 
 
@@ -284,6 +343,8 @@ void LoadObj( char *FileName, MODEL *Model )
 	Model->SubsetNum = subsetNum;
 
 
+	Model->boundingBox.minPoint = XMFLOAT3(FLT_MAX, FLT_MAX, FLT_MAX);
+	Model->boundingBox.maxPoint = XMFLOAT3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
 
 	//要素読込
@@ -346,6 +407,17 @@ void LoadObj( char *FileName, MODEL *Model )
 			position->x *= SCALE_MODEL;
 			position->y *= SCALE_MODEL;
 			position->z *= SCALE_MODEL;
+
+			// Update bounding box
+			Model->boundingBox.minPoint.x = min(Model->boundingBox.minPoint.x, position->x);
+			Model->boundingBox.minPoint.y = min(Model->boundingBox.minPoint.y, position->y);
+			Model->boundingBox.minPoint.z = min(Model->boundingBox.minPoint.z, position->z);
+
+			Model->boundingBox.maxPoint.x = max(Model->boundingBox.maxPoint.x, position->x);
+			Model->boundingBox.maxPoint.y = max(Model->boundingBox.maxPoint.y, position->y);
+			Model->boundingBox.maxPoint.z = max(Model->boundingBox.maxPoint.z, position->z);
+
+
 			position++;
 		}
 		else if( strcmp( str, "vn" ) == 0 )
@@ -380,6 +452,7 @@ void LoadObj( char *FileName, MODEL *Model )
 				if( strcmp( str, materialArray[i].Name ) == 0 )
 				{
 					Model->SubsetArray[ sc ].Material.Material = materialArray[i].Material;
+					Model->SubsetArray[sc].Material.Material.LoadMaterial = TRUE;
 					strcpy( Model->SubsetArray[ sc ].Material.TextureName, materialArray[i].TextureName );
 					strcpy( Model->SubsetArray[ sc ].Material.Name, materialArray[i].Name );
 
@@ -435,7 +508,6 @@ void LoadObj( char *FileName, MODEL *Model )
 
 	if( sc != 0 )
 		Model->SubsetArray[ sc - 1 ].IndexNum = ic - Model->SubsetArray[ sc - 1 ].StartIndex;
-
 
 
 
@@ -608,8 +680,125 @@ void SetModelDiffuse(DX11_MODEL *Model, int mno, XMFLOAT4 diffuse)
 	Model->SubsetArray[mno].Material.Material.Diffuse = diffuse;
 }
 
+void CreateBoundingBoxVertex(DX11_MODEL* Model)
+{
+	D3D11_MAPPED_SUBRESOURCE msr;
+	GetDeviceContext()->Map(Model->BBVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &msr);
+
+	VERTEX_3D* vertex = (VERTEX_3D*)msr.pData;
+
+	// 頂点座標の設定
+	vertex[0].Position = XMFLOAT3(Model->boundingBox.minPoint.x, Model->boundingBox.minPoint.y, Model->boundingBox.minPoint.z);
+	vertex[1].Position = XMFLOAT3(Model->boundingBox.maxPoint.x, Model->boundingBox.minPoint.y, Model->boundingBox.minPoint.z);
+	vertex[2].Position = XMFLOAT3(Model->boundingBox.minPoint.x, Model->boundingBox.maxPoint.y, Model->boundingBox.minPoint.z);
+
+	vertex[3].Position = XMFLOAT3(Model->boundingBox.maxPoint.x, Model->boundingBox.minPoint.y, Model->boundingBox.minPoint.z);
+	vertex[4].Position = XMFLOAT3(Model->boundingBox.maxPoint.x, Model->boundingBox.maxPoint.y, Model->boundingBox.minPoint.z);
+	vertex[5].Position = XMFLOAT3(Model->boundingBox.minPoint.x, Model->boundingBox.maxPoint.y, Model->boundingBox.minPoint.z);
+
+	vertex[6].Position = XMFLOAT3(Model->boundingBox.minPoint.x, Model->boundingBox.minPoint.y, Model->boundingBox.maxPoint.z);
+	vertex[7].Position = XMFLOAT3(Model->boundingBox.maxPoint.x, Model->boundingBox.minPoint.y, Model->boundingBox.maxPoint.z);
+	vertex[8].Position = XMFLOAT3(Model->boundingBox.minPoint.x, Model->boundingBox.maxPoint.y, Model->boundingBox.maxPoint.z);
+
+	vertex[9].Position = XMFLOAT3(Model->boundingBox.maxPoint.x, Model->boundingBox.minPoint.y, Model->boundingBox.maxPoint.z);
+	vertex[10].Position = XMFLOAT3(Model->boundingBox.maxPoint.x, Model->boundingBox.maxPoint.y, Model->boundingBox.maxPoint.z);
+	vertex[11].Position = XMFLOAT3(Model->boundingBox.minPoint.x, Model->boundingBox.maxPoint.y, Model->boundingBox.maxPoint.z);
+
+	vertex[12].Position = XMFLOAT3(Model->boundingBox.minPoint.x, Model->boundingBox.maxPoint.y, Model->boundingBox.minPoint.z);
+	vertex[13].Position = XMFLOAT3(Model->boundingBox.maxPoint.x, Model->boundingBox.maxPoint.y, Model->boundingBox.minPoint.z);
+	vertex[14].Position = XMFLOAT3(Model->boundingBox.minPoint.x, Model->boundingBox.maxPoint.y, Model->boundingBox.maxPoint.z);
+
+	vertex[15].Position = XMFLOAT3(Model->boundingBox.maxPoint.x, Model->boundingBox.maxPoint.y, Model->boundingBox.minPoint.z);
+	vertex[16].Position = XMFLOAT3(Model->boundingBox.maxPoint.x, Model->boundingBox.maxPoint.y, Model->boundingBox.maxPoint.z);
+	vertex[17].Position = XMFLOAT3(Model->boundingBox.minPoint.x, Model->boundingBox.maxPoint.y, Model->boundingBox.maxPoint.z);
+
+	vertex[18].Position = XMFLOAT3(Model->boundingBox.minPoint.x, Model->boundingBox.minPoint.y, Model->boundingBox.minPoint.z);
+	vertex[19].Position = XMFLOAT3(Model->boundingBox.maxPoint.x, Model->boundingBox.minPoint.y, Model->boundingBox.minPoint.z);
+	vertex[20].Position = XMFLOAT3(Model->boundingBox.minPoint.x, Model->boundingBox.minPoint.y, Model->boundingBox.maxPoint.z);
+
+	vertex[21].Position = XMFLOAT3(Model->boundingBox.maxPoint.x, Model->boundingBox.minPoint.y, Model->boundingBox.minPoint.z);
+	vertex[22].Position = XMFLOAT3(Model->boundingBox.maxPoint.x, Model->boundingBox.minPoint.y, Model->boundingBox.maxPoint.z);
+	vertex[23].Position = XMFLOAT3(Model->boundingBox.minPoint.x, Model->boundingBox.minPoint.y, Model->boundingBox.maxPoint.z);
 
 
+	// 法線の設定
+	vertex[0].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[1].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[2].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[3].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[4].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[5].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[6].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[7].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[8].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[9].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[10].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[11].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[12].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[13].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[14].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[15].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[16].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[17].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[18].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[19].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[20].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[21].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[22].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	vertex[23].Normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
 
+	// 拡散光の設定
+	vertex[0].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[1].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[2].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[3].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[4].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[5].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[6].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[7].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[8].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[9].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[10].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[11].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[12].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[13].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[14].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[15].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[16].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[17].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[18].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[19].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[20].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[21].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[22].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex[23].Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 
+	// テクスチャ座標の設定
+	vertex[0].TexCoord = XMFLOAT2(0.0f, 0.0f);
+	vertex[1].TexCoord = XMFLOAT2(1.0f, 0.0f);
+	vertex[2].TexCoord = XMFLOAT2(0.0f, 1.0f);
+	vertex[3].TexCoord = XMFLOAT2(1.0f, 1.0f);
+	vertex[4].TexCoord = XMFLOAT2(0.0f, 0.0f);
+	vertex[5].TexCoord = XMFLOAT2(1.0f, 0.0f);
+	vertex[6].TexCoord = XMFLOAT2(0.0f, 1.0f);
+	vertex[7].TexCoord = XMFLOAT2(1.0f, 1.0f);
+	vertex[8].TexCoord = XMFLOAT2(0.0f, 0.0f);
+	vertex[9].TexCoord = XMFLOAT2(1.0f, 0.0f);
+	vertex[10].TexCoord = XMFLOAT2(0.0f, 1.0f);
+	vertex[11].TexCoord = XMFLOAT2(1.0f, 1.0f);
+	vertex[12].TexCoord = XMFLOAT2(0.0f, 0.0f);
+	vertex[13].TexCoord = XMFLOAT2(1.0f, 0.0f);
+	vertex[14].TexCoord = XMFLOAT2(0.0f, 1.0f);
+	vertex[15].TexCoord = XMFLOAT2(1.0f, 1.0f);
+	vertex[16].TexCoord = XMFLOAT2(0.0f, 0.0f);
+	vertex[17].TexCoord = XMFLOAT2(1.0f, 0.0f);
+	vertex[18].TexCoord = XMFLOAT2(0.0f, 1.0f);
+	vertex[19].TexCoord = XMFLOAT2(1.0f, 1.0f);
+	vertex[20].TexCoord = XMFLOAT2(0.0f, 0.0f);
+	vertex[21].TexCoord = XMFLOAT2(1.0f, 0.0f);
+	vertex[22].TexCoord = XMFLOAT2(0.0f, 1.0f);
+	vertex[23].TexCoord = XMFLOAT2(1.0f, 1.0f);
+
+	GetDeviceContext()->Unmap(Model->BBVertexBuffer, 0);
+}
 

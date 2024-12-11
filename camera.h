@@ -27,6 +27,7 @@ struct CAMERA
 	XMFLOAT3			rot;			// カメラの回転
 	
 	float				len;			// カメラの視点と注視点の距離
+	float				fov;
 
 };
 

@@ -144,12 +144,14 @@
     <ClInclude Include="input.h" />
     <ClInclude Include="light.h" />
     <ClInclude Include="main.h" />
+    <ClInclude Include="MapEditor.h" />
     <ClInclude Include="model.h" />
     <ClInclude Include="offScreenRender.h" />
     <ClInclude Include="player.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="score.h" />
     <ClInclude Include="shadow.h" />
+    <ClInclude Include="SingletonBase.h" />
     <ClInclude Include="sprite.h" />
     <ClInclude Include="Vertex.h" />
   </ItemGroup>
@@ -163,6 +165,7 @@
     <ClCompile Include="input.cpp" />
     <ClCompile Include="light.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MapEditor.cpp" />
     <ClCompile Include="model.cpp" />
     <ClCompile Include="offScreenRender.cpp" />
     <ClCompile Include="player.cpp" />

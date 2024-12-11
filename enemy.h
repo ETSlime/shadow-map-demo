@@ -81,3 +81,4 @@ void UpdateHPGauge(int idx);
 void DrawHPGauge(int idx);
 void PlayEnemyWalkAnim(ENEMY* enemy);
 HRESULT MakeVertexHPGauge(int w, int h);
+void UpdateEditorSelect(ENEMY* enemy, int sx, int sy);

@@ -126,6 +126,7 @@ static LIGHT_CBUFFER	g_Light;
 static FOG_CBUFFER		g_Fog;
 
 static FUCHI			g_Fuchi;
+static INT				g_RenderMode = RENDER_MODE_SCENE;
 
 static float g_ClearColor[4] = { 0.3f, 0.3f, 0.3f, 1.0f };	// ”wŒiF
 
@@ -144,10 +145,18 @@ ID3D11DeviceContext* GetDeviceContext( void )
 
 void SetDepthEnable( BOOL Enable )
 {
-	if( Enable )
-		g_ImmediateContext->OMSetDepthStencilState( g_DepthStateEnable, NULL );
+	if (Enable)
+	{
+		g_ImmediateContext->OMSetDepthStencilState(g_DepthStateEnable, NULL);
+		GetDeviceContext()->OMSetRenderTargets(1, &g_RenderTargetView, g_SceneDepthStencilView);
+	}
+		
 	else
-		g_ImmediateContext->OMSetDepthStencilState( g_DepthStateDisable, NULL );
+	{
+		g_ImmediateContext->OMSetDepthStencilState(g_DepthStateDisable, NULL);
+		g_ImmediateContext->OMSetRenderTargets(1, &g_RenderTargetView, nullptr);
+	}
+		
 
 }
 
@@ -189,6 +198,19 @@ void SetCullingMode(CULL_MODE cm)
 		g_ImmediateContext->RSSetState(g_RasterStateCullCCW);
 		break;
 	}
+}
+
+void SetFillMode(D3D11_FILL_MODE mode)
+{
+	ID3D11RasterizerState* pRasterizerState;
+	GetDeviceContext()->RSGetState(&pRasterizerState);
+	D3D11_RASTERIZER_DESC rasterDesc;
+	pRasterizerState->GetDesc(&rasterDesc);
+	rasterDesc.FillMode = mode;
+	ID3D11RasterizerState* newRasterizerState;
+	g_D3DDevice->CreateRasterizerState(&rasterDesc, &newRasterizerState);
+	g_ImmediateContext->RSSetState(newRasterizerState);
+
 }
 
 void SetAlphaTestEnable(BOOL flag)
@@ -382,6 +404,7 @@ void SetShaderCamera(XMFLOAT3 pos)
 
 void SetRenderShadowMap(int lightIdx)
 {
+	g_RenderMode = RENDER_MODE_SHADOW;
 	ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
 	GetDeviceContext()->PSSetShaderResources(1, 1, nullSRV);
 
@@ -398,7 +421,7 @@ void SetRenderShadowMap(int lightIdx)
 
 void SetRenderObject(void)
 {
-
+	g_RenderMode = RENDER_MODE_SCENE;
 	ResetRenderTarget();
 	GetDeviceContext()->ClearDepthStencilView(g_SceneDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
@@ -929,4 +952,9 @@ void DebugTextOut(char* text, int x, int y)
 		g_ImmediateContext->OMSetRenderTargets(1, &g_RenderTargetView, g_SceneDepthStencilView);
 	}
 #endif
+}
+
+int GetRenderMode(void)
+{
+	return g_RenderMode;
 }
